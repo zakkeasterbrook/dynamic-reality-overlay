@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Golf Range Finder App</title>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.125.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
     <style>
         body {
             margin: 0;
@@ -15,15 +18,6 @@
             height: 100vh;
             background-color: #000;
             position: relative;
-        }
-        #camera {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            z-index: 1;
         }
         #distance-output {
             position: absolute;
@@ -52,62 +46,80 @@
     </style>
 </head>
 <body>
-    <!-- Camera Feed -->
-    <video id="camera" autoplay playsinline></video>
+    <!-- A-Frame Scene for AR -->
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+        <!-- AR Camera -->
+        <a-entity camera look-controls>
+            <a-entity cursor="fuse: false; rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
+        </a-entity>
 
-    <!-- Distance Output -->
+        <!-- Target Point for Measuring Distance -->
+        <a-sphere id="target-point" class="clickable" radius="0.2" color="red" visible="false"></a-sphere>
+
+        <!-- Realistic Lighting -->
+        <a-light type="directional" position="2 4 4" intensity="1" castShadow="true"></a-light>
+        <a-light type="ambient" color="#ffffff" intensity="0.5"></a-light>
+    </a-scene>
+
+    <!-- UI Elements -->
     <div id="distance-output">Distance: -- Yards</div>
 
     <!-- Error Log Section -->
     <div id="error-log"></div>
 
     <script>
-        const video = document.getElementById('camera');
+        // Initialize variables
+        const targetPoint = document.getElementById('target-point');
         const distanceOutput = document.getElementById('distance-output');
         const errorLog = document.getElementById('error-log');
+        const camera = document.querySelector('[camera]');
+        const scene = document.querySelector('a-scene');
 
-        // Initialize camera feed
-        async function startCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-                video.srcObject = stream;
-            } catch (error) {
-                logError(`Error accessing the camera: ${error.message}`);
-            }
+        // Function to reset the measurement
+        function resetDistance() {
+            targetPoint.setAttribute('visible', 'false');
+            distanceOutput.textContent = 'Distance: -- Yards';
         }
 
-        // Placeholder for initial user position
-        let userPosition = null;
-
-        // Function to handle tap and measure distance
-        video.addEventListener('click', (event) => {
-            if (!userPosition) {
-                // Save the initial touch position
-                userPosition = { x: event.clientX, y: event.clientY };
-                distanceOutput.textContent = 'Tap again to measure distance';
-            } else {
-                // Calculate distance between initial and new tap position
-                const newX = event.clientX;
-                const newY = event.clientY;
-                const distancePx = Math.sqrt(Math.pow(newX - userPosition.x, 2) + Math.pow(newY - userPosition.y, 2));
-
-                // Convert pixel distance to a rough estimate in yards (simplified approach)
-                const distanceYards = (distancePx / window.innerWidth) * 100; // Example scaling factor
-                distanceOutput.textContent = `Distance: ${distanceYards.toFixed(2)} Yards`;
-
-                // Reset user position for next measurement
-                userPosition = null;
+        // Handle user tap to select object
+        scene.addEventListener('click', (event) => {
+            try {
+                const cursor = document.querySelector('a-entity[cursor]');
+                const intersection = cursor.components.raycaster.getIntersection(targetPoint);
+                if (!intersection) {
+                    const newPosition = new THREE.Vector3().copy(camera.object3D.position);
+                    const direction = new THREE.Vector3();
+                    camera.object3D.getWorldDirection(direction);
+                    newPosition.add(direction.multiplyScalar(50)); // Approximate distance
+                    targetPoint.setAttribute('position', newPosition);
+                    targetPoint.setAttribute('visible', 'true');
+                    calculateDistance(newPosition);
+                }
+            } catch (error) {
+                logError(error);
             }
         });
 
-        function logError(message) {
-            errorLog.style.display = 'block';
-            errorLog.textContent += `${message}\n`;
-            console.error(message);
+        // Calculate distance in real-time
+        function calculateDistance(targetPosition) {
+            try {
+                const userPosition = new THREE.Vector3().setFromMatrixPosition(camera.object3D.matrixWorld);
+                const distance = userPosition.distanceTo(targetPosition);
+
+                // Convert distance from meters to yards (1 meter = 1.09361 yards)
+                const distanceInYards = distance * 1.09361;
+                distanceOutput.textContent = `Distance: ${distanceInYards.toFixed(2)} Yards`;
+            } catch (error) {
+                logError(error);
+            }
         }
 
-        // Start the camera when the page loads
-        startCamera();
+        // Log errors to the screen
+        function logError(error) {
+            errorLog.style.display = 'block';
+            errorLog.textContent += `Error: ${error.message}\n`;
+            console.error(error);
+        }
     </script>
 </body>
 </html>
