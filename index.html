@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Immersive AR Treasure Chest Reveal Game</title>
+    <title>Golf Range Finder App</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://cdn.rawgit.com/AR-js-org/AR.js/3.3.2/aframe/build/aframe-ar.js"></script>
     <style>
@@ -41,37 +41,28 @@
         .button:hover {
             transform: scale(1.1);
         }
+        #distance-output {
+            position: absolute;
+            top: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            color: yellow;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 5;
+        }
     </style>
 </head>
 <body>
     <!-- A-Frame Scene for AR -->
     <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
-        <!-- AR Marker -->
+        <!-- AR Marker (you can use any pattern marker) -->
         <a-marker preset="hiro">
-            <!-- 3D Treasure Chest Model -->
-            <a-entity id="treasure-chest" 
-                      position="0 0 0" 
-                      scale="0.5 0.5 0.5"
-                      gltf-model="url(https://raw.githubusercontent.com/zakkeasterbrook/dynamic-reality-overlay/main/scene.gltf)"
-                      shadow="cast: true; receive: true"
-                      animation-mixer>
-                <!-- Invisible Box for Interaction -->
-                <a-box id="chest-interaction" 
-                       position="0 0.5 0" 
-                       width="1" 
-                       height="1" 
-                       depth="1" 
-                       material="opacity: 0; transparent: true;"></a-box>
+            <!-- Flag Marker -->
+            <a-entity id="flag" geometry="primitive: cone; radiusBottom: 0.1; radiusTop: 0; height: 0.5;" 
+                      material="color: red;" position="0 0 0" 
+                      event-set__click="_event: click; color: green;">
             </a-entity>
-
-            <!-- Prize/Message Text -->
-            <a-text id="message-text" 
-                    value="" 
-                    position="0 1.5 0" 
-                    rotation="0 0 0" 
-                    scale="3 3 3" 
-                    visible="false" 
-                    color="#FFD700"></a-text>
         </a-marker>
 
         <!-- AR Camera -->
@@ -84,50 +75,32 @@
 
     <!-- UI Elements -->
     <div id="ui">
-        <button class="button" onclick="resetGame()">Reset Game</button>
+        <button class="button" onclick="calculateDistance()">Measure Distance</button>
+        <div id="distance-output">Distance: -- Yards</div>
     </div>
 
     <script>
-        const chestInteraction = document.getElementById('chest-interaction');
-        const messageText = document.getElementById('message-text');
-        let isOpened = false;
+        let flag = document.getElementById('flag');
+        let distanceOutput = document.getElementById('distance-output');
+        let userPosition = { x: 0, y: 0, z: 0 }; // Placeholder for the user's position
+        let isMeasuring = false;
 
-        // Randomize the outcome of the game
-        const isWinner = Math.random() > 0.5;
+        function calculateDistance() {
+            if (!isMeasuring) {
+                isMeasuring = true;
+                // Assuming the user's position is the origin (0, 0, 0)
+                let flagPosition = flag.object3D.position;
+                let distance = Math.sqrt(
+                    Math.pow(flagPosition.x - userPosition.x, 2) +
+                    Math.pow(flagPosition.y - userPosition.y, 2) +
+                    Math.pow(flagPosition.z - userPosition.z, 2)
+                );
 
-        chestInteraction.addEventListener('click', () => {
-            if (isOpened) return; // Prevent multiple taps
-            isOpened = true;
-            openChest();
-        });
-
-        function openChest() {
-            // Play chest opening animation
-            document.getElementById('treasure-chest').setAttribute('animation', 'property: rotation; to: 0 45 0; dur: 500; easing: easeOutCubic; loop: 2');
-
-            // Show outcome after animation
-            setTimeout(() => {
-                messageText.setAttribute('value', isWinner ? '🎉 Congratulations! You Won! 🎉' : '🙁 Sorry, Try Again! 🙁');
-                messageText.setAttribute('visible', 'true');
-                createWinEffect(isWinner);
-            }, 1600);
-        }
-
-        function createWinEffect(win) {
-            const particlesCount = win ? 100 : 50;
-            for (let i = 0; i < particlesCount; i++) {
-                const particle = document.createElement('a-entity');
-                particle.setAttribute('geometry', 'primitive: sphere; radius: 0.05');
-                particle.setAttribute('material', `color: ${win ? 'gold' : 'silver'}`);
-                particle.setAttribute('position', `${Math.random() - 0.5} ${Math.random()} ${Math.random() - 0.5}`);
-                particle.setAttribute('animation', 'property: position; to: 0 2 -1; dur: 3000; easing: easeOutQuad');
-                particle.setAttribute('animation__scale', 'property: scale; to: 0 0 0; dur: 3000; easing: easeOutQuad');
-                messageText.appendChild(particle);
+                // Convert distance from meters to yards (1 meter = 1.09361 yards)
+                let distanceInYards = distance * 1.09361;
+                distanceOutput.textContent = `Distance: ${distanceInYards.toFixed(2)} Yards`;
+                isMeasuring = false;
             }
-        }
-
-        function resetGame() {
-            location.reload(); // Reset by reloading the page
         }
     </script>
 </body>
