@@ -90,7 +90,7 @@
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'environment', frameRate: { ideal: 60, max: 120 } } 
+                    video: { facingMode: { ideal: 'environment' }, frameRate: { ideal: 60, max: 120 } } 
                 });
                 video.srcObject = stream;
                 video.onloadedmetadata = () => {
@@ -246,7 +246,7 @@
         // Toggle the bounding box visibility
         function toggleBoundingBox() {
             showBoundingBox = !showBoundingBox;
-                        logError(`Bounding box ${showBoundingBox ? 'enabled' : 'disabled'}.`);
+            logError(`Bounding box ${showBoundingBox ? 'enabled' : 'disabled'}.`);
         }
 
         // Start the camera and begin detection
