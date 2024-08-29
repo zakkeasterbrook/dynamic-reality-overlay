@@ -3,31 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Treasure Chest Reveal Game</title>
-    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <script src="https://cdn.rawgit.com/AR-js-org/AR.js/3.3.2/aframe/build/aframe-ar.js"></script>
+    <title>Interactive AR Treasure Chest Reveal Game</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            font-family: 'Arial', sans-serif;
             display: flex;
-            align-items: center;
             justify-content: center;
+            align-items: center;
             height: 100vh;
             background-color: #000;
+            font-family: 'Arial', sans-serif;
         }
-        #ui {
+        .sketchfab-embed-wrapper {
+            width: 80%;
+            height: 80%;
+            position: relative;
+            z-index: 1;
+        }
+        #message {
             position: absolute;
-            bottom: 5%;
-            width: 100%;
-            text-align: center;
-            color: white;
-            font-size: 20px;
-            z-index: 5;
+            top: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #FFD700;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 2;
+            display: none; /* Hidden initially */
         }
         .button {
-            display: inline-block;
+            position: absolute;
+            bottom: 5%;
+            left: 50%;
+            transform: translateX(-50%);
             padding: 10px 20px;
             background-color: #FF6347;
             border: none;
@@ -36,7 +45,7 @@
             cursor: pointer;
             border-radius: 8px;
             transition: transform 0.2s;
-            margin: 10px;
+            z-index: 3;
         }
         .button:hover {
             transform: scale(1.1);
@@ -44,74 +53,35 @@
     </style>
 </head>
 <body>
-    <!-- A-Frame Scene -->
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
-        <!-- AR Marker -->
-        <a-marker preset="hiro">
-            <!-- 3D Treasure Chest -->
-            <a-entity id="treasure-chest" position="0 0 0" scale="1 1 1" gltf-model="url(https://cdn.glitch.com/66e405b6-3c9f-4068-8bde-e2294c55809b%2Fchest.glb?v=1621848991406)" animation-mixer>
-                <!-- Invisible Box for Tapping -->
-                <a-box id="chest-box" position="0 0.5 0" width="1" height="1" depth="1" material="opacity: 0; transparent: true;"></a-box>
-            </a-entity>
-
-            <!-- Prize/Message Text -->
-            <a-text id="message-text" value="" position="0 1.5 0" rotation="0 0 0" scale="3 3 3" visible="false" color="#FFD700"></a-text>
-        </a-marker>
-
-        <!-- AR Camera -->
-        <a-entity camera></a-entity>
-        
-        <!-- Lights for Realism -->
-        <a-light type="directional" position="2 4 4" intensity="1" castShadow="true"></a-light>
-        <a-light type="ambient" color="#ffffff" intensity="0.5"></a-light>
-    </a-scene>
-
-    <!-- UI Elements -->
-    <div id="ui">
-        <button class="button" onclick="resetGame()">Reset Game</button>
+    <!-- Sketchfab Embed -->
+    <div class="sketchfab-embed-wrapper" id="chest-wrapper">
+        <iframe title="Treasure Chest" frameborder="0" allowfullscreen mozallowfullscreen="true" webkitallowfullscreen="true" allow="autoplay; fullscreen; xr-spatial-tracking" src="https://sketchfab.com/models/b124919b7bc3470c82daeef72823f941/embed" id="chest-iframe"></iframe>
     </div>
 
-    <script>
-        const chestBox = document.getElementById('chest-box');
-        const messageText = document.getElementById('message-text');
-        let isOpened = false;
+    <!-- Win/Loss Message -->
+    <div id="message">Congratulations! You won a prize!</div>
 
-        // Randomize the outcome of the game
+    <!-- Reveal Button -->
+    <button class="button" id="reveal-button" onclick="revealOutcome()">Open the Chest</button>
+
+    <script>
+        const chestIframe = document.getElementById('chest-iframe');
+        const message = document.getElementById('message');
+        const revealButton = document.getElementById('reveal-button');
+
+        // Randomize the win/loss outcome
         const isWinner = Math.random() > 0.5;
 
-        chestBox.addEventListener('click', () => {
-            if (isOpened) return; // Prevent multiple taps
-            isOpened = true;
-            openChest();
-        });
+        function revealOutcome() {
+            // Show animation (for the purpose of this example, we'll use the embed's default animations)
+            chestIframe.contentWindow.postMessage({ method: 'play', animation: 'Open' }, '*');
 
-        function openChest() {
-            // Play opening animation
-            document.getElementById('treasure-chest').setAttribute('animation', 'property: rotation; to: 0 360 0; dur: 1000; easing: easeOutCubic; loop: false');
-            
-            // Show outcome after animation
+            // Show the win/loss message after a delay
             setTimeout(() => {
-                messageText.setAttribute('value', isWinner ? '🎉 Congratulations! You Won! 🎉' : '🙁 Sorry, Try Again! 🙁');
-                messageText.setAttribute('visible', 'true');
-                createWinEffect(isWinner);
-            }, 1200);
-        }
-
-        function createWinEffect(win) {
-            const particlesCount = win ? 50 : 20;
-            for (let i = 0; i < particlesCount; i++) {
-                const particle = document.createElement('a-entity');
-                particle.setAttribute('geometry', 'primitive: sphere; radius: 0.05');
-                particle.setAttribute('material', `color: ${win ? 'gold' : 'silver'}`);
-                particle.setAttribute('position', `${Math.random() - 0.5} ${Math.random()} ${Math.random() - 0.5}`);
-                particle.setAttribute('animation', 'property: position; to: 0 2 -1; dur: 2000; easing: easeOutQuad');
-                particle.setAttribute('animation__scale', 'property: scale; to: 0 0 0; dur: 2000; easing: easeOutQuad');
-                messageText.appendChild(particle);
-            }
-        }
-
-        function resetGame() {
-            location.reload(); // Reset by reloading the page
+                message.innerText = isWinner ? '🎉 Congratulations! You Won! 🎉' : '🙁 Sorry, Try Again! 🙁';
+                message.style.display = 'block';
+                revealButton.style.display = 'none'; // Hide the button after use
+            }, 2000); // 2-second delay for animation
         }
     </script>
 </body>
