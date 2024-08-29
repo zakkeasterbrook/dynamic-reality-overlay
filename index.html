@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Golf Range Finder App</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.125.2/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
     <style>
         body {
@@ -93,10 +94,10 @@
     <div id="error-log"></div>
 
     <script>
+        // Initialize variables
         let targetPoint = document.getElementById('target-point');
         let distanceOutput = document.getElementById('distance-output');
         let errorLog = document.getElementById('error-log');
-        let userPosition = new THREE.Vector3(); // Stores the user's position
         let camera = document.querySelector('[camera]');
         let scene = document.querySelector('a-scene');
 
@@ -112,8 +113,10 @@
                 let cursor = document.querySelector('a-entity[cursor]');
                 let intersection = cursor.components.raycaster.getIntersection(targetPoint);
                 if (!intersection) {
-                    let newPosition = camera.object3D.position.clone();
-                    newPosition.add(camera.object3D.getWorldDirection(new THREE.Vector3()).multiplyScalar(10)); // 10 meters in front of the camera
+                    let newPosition = new THREE.Vector3().copy(camera.object3D.position);
+                    let direction = new THREE.Vector3();
+                    camera.object3D.getWorldDirection(direction);
+                    newPosition.add(direction.multiplyScalar(10)); // 10 meters in front of the camera
                     targetPoint.setAttribute('position', newPosition);
                     targetPoint.setAttribute('visible', 'true');
                     calculateDistance(newPosition);
@@ -126,7 +129,7 @@
         function calculateDistance(targetPosition) {
             try {
                 // Get camera position
-                userPosition.setFromMatrixPosition(camera.object3D.matrixWorld);
+                let userPosition = new THREE.Vector3().setFromMatrixPosition(camera.object3D.matrixWorld);
                 let distance = userPosition.distanceTo(targetPosition);
 
                 // Convert distance from meters to yards (1 meter = 1.09361 yards)
