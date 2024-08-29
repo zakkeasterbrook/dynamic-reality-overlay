@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate AR Scratch-to-Win Game</title>
+    <title>AR Treasure Chest Reveal Game</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://cdn.rawgit.com/AR-js-org/AR.js/3.3.2/aframe/build/aframe-ar.js"></script>
     <style>
@@ -17,7 +17,6 @@
             height: 100vh;
             background-color: #000;
         }
-        
         #ui {
             position: absolute;
             bottom: 5%;
@@ -27,7 +26,6 @@
             font-size: 20px;
             z-index: 5;
         }
-
         .button {
             display: inline-block;
             padding: 10px 20px;
@@ -40,14 +38,8 @@
             transition: transform 0.2s;
             margin: 10px;
         }
-
         .button:hover {
             transform: scale(1.1);
-        }
-
-        #timer, #scratch-counter {
-            margin-top: 10px;
-            font-size: 18px;
         }
     </style>
 </head>
@@ -56,132 +48,70 @@
     <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
         <!-- AR Marker -->
         <a-marker preset="hiro">
-            <!-- 3D Scratch Card -->
-            <a-entity id="scratch-card" position="0 0 0" rotation="0 0 0" scale="1 1 1">
-                <!-- Base of the Card -->
-                <a-box id="card-base" position="0 0.1 0" depth="1" height="0.01" width="1" color="#f4f4f4" shadow></a-box>
-                
-                <!-- Scratchable Layers -->
-                <a-plane id="scratch-layer1" position="0 0.12 0" width="1" height="1" color="#999999" material="opacity: 1; transparent: true;" shadow></a-plane>
-                <a-plane id="scratch-layer2" position="0 0.14 0" width="1" height="1" color="#666666" material="opacity: 1; transparent: true;" visible="false" shadow></a-plane>
-                
-                <!-- Hidden Symbols -->
-                <a-text id="win-text" value="🎉 You Win! 🎉" position="0 0.5 0" rotation="0 0 0" scale="3 3 3" visible="false" color="#00FF00" shadow></a-text>
-                <a-text id="lose-text" value="🙁 Try Again! 🙁" position="0 0.5 0" rotation="0 0 0" scale="3 3 3" visible="false" color="#FF0000" shadow></a-text>
+            <!-- 3D Treasure Chest -->
+            <a-entity id="treasure-chest" position="0 0 0" scale="1 1 1" gltf-model="url(https://cdn.glitch.com/66e405b6-3c9f-4068-8bde-e2294c55809b%2Fchest.glb?v=1621848991406)" animation-mixer>
+                <!-- Invisible Box for Tapping -->
+                <a-box id="chest-box" position="0 0.5 0" width="1" height="1" depth="1" material="opacity: 0; transparent: true;"></a-box>
             </a-entity>
+
+            <!-- Prize/Message Text -->
+            <a-text id="message-text" value="" position="0 1.5 0" rotation="0 0 0" scale="3 3 3" visible="false" color="#FFD700"></a-text>
         </a-marker>
 
         <!-- AR Camera -->
         <a-entity camera></a-entity>
         
-        <!-- Lights and Shadows for Realism -->
+        <!-- Lights for Realism -->
         <a-light type="directional" position="2 4 4" intensity="1" castShadow="true"></a-light>
         <a-light type="ambient" color="#ffffff" intensity="0.5"></a-light>
     </a-scene>
 
     <!-- UI Elements -->
     <div id="ui">
-        <button class="button" onclick="startGame()">Start Game</button>
         <button class="button" onclick="resetGame()">Reset Game</button>
-        <div id="timer">Timer: 00:00</div>
-        <div id="scratch-counter">Scratches: 0</div>
     </div>
 
     <script>
-        let isScratching = false;
-        const scratchLayer1 = document.getElementById('scratch-layer1');
-        const scratchLayer2 = document.getElementById('scratch-layer2');
-        const winText = document.getElementById('win-text');
-        const loseText = document.getElementById('lose-text');
-        let scratchCount = 0;
-        const maxScratches = 20; // Scratches needed to reveal first layer
-        const maxScratchesLayer2 = 10; // Scratches for the second layer
-        const timerElement = document.getElementById('timer');
-        const scratchCounterElement = document.getElementById('scratch-counter');
-        let startTime, interval;
+        const chestBox = document.getElementById('chest-box');
+        const messageText = document.getElementById('message-text');
+        let isOpened = false;
 
         // Randomize the outcome of the game
         const isWinner = Math.random() > 0.5;
 
-        function startGame() {
-            isScratching = true;
-            startTime = Date.now();
-            interval = setInterval(updateTimer, 1000);
-            document.querySelectorAll('.button').forEach(btn => btn.style.display = 'none');
+        chestBox.addEventListener('click', () => {
+            if (isOpened) return; // Prevent multiple taps
+            isOpened = true;
+            openChest();
+        });
+
+        function openChest() {
+            // Play opening animation
+            document.getElementById('treasure-chest').setAttribute('animation', 'property: rotation; to: 0 360 0; dur: 1000; easing: easeOutCubic; loop: false');
+            
+            // Show outcome after animation
+            setTimeout(() => {
+                messageText.setAttribute('value', isWinner ? '🎉 Congratulations! You Won! 🎉' : '🙁 Sorry, Try Again! 🙁');
+                messageText.setAttribute('visible', 'true');
+                createWinEffect(isWinner);
+            }, 1200);
+        }
+
+        function createWinEffect(win) {
+            const particlesCount = win ? 50 : 20;
+            for (let i = 0; i < particlesCount; i++) {
+                const particle = document.createElement('a-entity');
+                particle.setAttribute('geometry', 'primitive: sphere; radius: 0.05');
+                particle.setAttribute('material', `color: ${win ? 'gold' : 'silver'}`);
+                particle.setAttribute('position', `${Math.random() - 0.5} ${Math.random()} ${Math.random() - 0.5}`);
+                particle.setAttribute('animation', 'property: position; to: 0 2 -1; dur: 2000; easing: easeOutQuad');
+                particle.setAttribute('animation__scale', 'property: scale; to: 0 0 0; dur: 2000; easing: easeOutQuad');
+                messageText.appendChild(particle);
+            }
         }
 
         function resetGame() {
-            location.reload(); // Simple reset by reloading the page
-        }
-
-        // Update Timer
-        function updateTimer() {
-            const elapsed = Date.now() - startTime;
-            const minutes = Math.floor(elapsed / 60000);
-            const seconds = Math.floor((elapsed % 60000) / 1000);
-            timerElement.innerHTML = `Timer: ${minutes < 10 ? '0' + minutes : minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
-        }
-
-        // Scratch layer logic for multiple layers
-        scratchLayer1.addEventListener('click', () => {
-            if (!isScratching) return;
-            scratchCount++;
-            scratchLayer1.setAttribute('material', 'opacity', 1 - scratchCount / maxScratches);
-            createScratchEffect(scratchLayer1);
-
-            scratchCounterElement.innerHTML = `Scratches: ${scratchCount}`;
-
-            if (scratchCount >= maxScratches) {
-                scratchLayer2.setAttribute('visible', 'true');
-                scratchLayer1.setAttribute('visible', 'false');
-                scratchCount = 0; // Reset count for the next layer
-            }
-        });
-
-        scratchLayer2.addEventListener('click', () => {
-            if (!isScratching) return;
-            scratchCount++;
-            scratchLayer2.setAttribute('material', 'opacity', 1 - scratchCount / maxScratchesLayer2);
-            createScratchEffect(scratchLayer2);
-
-            scratchCounterElement.innerHTML = `Scratches: ${scratchCount}`;
-
-            if (scratchCount >= maxScratchesLayer2) {
-                isScratching = false;
-                revealOutcome();
-            }
-        });
-
-        function revealOutcome() {
-            clearInterval(interval);
-            if (isWinner) {
-                winText.setAttribute('visible', 'true');
-                createConfettiEffect(winText);
-            } else {
-                loseText.setAttribute('visible', 'true');
-                createConfettiEffect(loseText, false);
-            }
-        }
-
-        // Create Scratch Particle Effect
-        function createScratchEffect(layer) {
-            const scratchParticles = document.createElement('a-entity');
-            scratchParticles.setAttribute('geometry', 'primitive: sphere; radius: 0.02');
-            scratchParticles.setAttribute('material', 'color: #ffffff');
-            scratchParticles.setAttribute('position', `${(Math.random() - 0.5)} ${(Math.random() - 0.5)} 0.1`);
-            layer.appendChild(scratchParticles);
-        }
-
-        // Create Confetti Effect for Win/Loss
-        function createConfettiEffect(target, win = true) {
-            for (let i = 0; i < 100; i++) {
-                const confetti = document.createElement('a-entity');
-                confetti.setAttribute('geometry', 'primitive: box; width: 0.02; height: 0.02; depth: 0.02');
-                confetti.setAttribute('material', `color: ${win ? 'yellow' : 'red'}`);
-                confetti.setAttribute('position', `${Math.random() - 0.5} ${Math.random()} ${Math.random() - 0.5}`);
-                confetti.setAttribute('animation', `property: position; to: 0 -2 0; easing: easeOutQuad; dur: 2000`);
-                target.appendChild(confetti);
-            }
+            location.reload(); // Reset by reloading the page
         }
     </script>
 </body>
