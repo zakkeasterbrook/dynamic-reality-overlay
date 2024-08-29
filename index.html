@@ -3,132 +3,126 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Golf Range Finder App</title>
+    <title>Advanced Golf Swing Speed Estimator</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            font-family: 'Arial', sans-serif;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             height: 100vh;
             background-color: #000;
-            position: relative;
         }
         #camera {
+            width: 100%;
+            height: 70%;
+            background: #333;
+            object-fit: cover;
+        }
+        #output {
+            color: yellow;
+            font-size: 24px;
+            margin-top: 10px;
+        }
+        #error-log {
+            color: red;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        #visual-feedback {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
-            height: 100%;
-            object-fit: cover;
-            z-index: 1;
-        }
-        #bullseye {
-            position: absolute;
-            width: 50px;
-            height: 50px;
-            border: 2px solid yellow;
-            border-radius: 50%;
-            background-color: rgba(255, 255, 0, 0.2);
+            height: 70%;
+            pointer-events: none;
             z-index: 2;
-            pointer-events: none; /* Ensures it doesn't interfere with taps */
-            display: none;
-        }
-        #distance-output {
-            position: absolute;
-            top: 10%;
-            left: 50%;
-            transform: translateX(-50%);
-            color: yellow;
-            font-size: 24px;
-            font-weight: bold;
-            z-index: 5;
-        }
-        #error-log {
-            position: absolute;
-            bottom: 20%;
-            width: 90%;
-            left: 5%;
-            background-color: rgba(0, 0, 0, 0.8);
-            color: red;
-            font-size: 14px;
-            z-index: 10;
-            max-height: 150px;
-            overflow-y: auto;
-            padding: 10px;
-            display: none;
         }
     </style>
 </head>
 <body>
-    <!-- Camera Feed -->
     <video id="camera" autoplay playsinline></video>
-
-    <!-- Bullseye Overlay -->
-    <div id="bullseye"></div>
-
-    <!-- Distance Output -->
-    <div id="distance-output">Distance: -- Yards</div>
-
-    <!-- Error Log Section -->
+    <canvas id="visual-feedback"></canvas>
+    <div id="output">Swing Speed: -- mph</div>
     <div id="error-log"></div>
 
     <script>
         const video = document.getElementById('camera');
-        const bullseye = document.getElementById('bullseye');
-        const distanceOutput = document.getElementById('distance-output');
+        const canvas = document.getElementById('visual-feedback');
+        const context = canvas.getContext('2d');
+        const output = document.getElementById('output');
         const errorLog = document.getElementById('error-log');
 
         // Initialize camera feed
         async function startCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment', frameRate: { ideal: 60, max: 120 } } 
+                });
                 video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                };
             } catch (error) {
                 logError(`Error accessing the camera: ${error.message}`);
             }
         }
 
-        // Placeholder for initial user position
-        let userPosition = null;
+        // Variables for motion tracking
+        let previousFrame = null;
+        let previousTime = null;
 
-        // Function to handle tap and measure distance
-        video.addEventListener('click', (event) => {
-            // Show bullseye at tap location
-            bullseye.style.left = `${event.clientX - 25}px`;
-            bullseye.style.top = `${event.clientY - 25}px`;
-            bullseye.style.display = 'block';
+        // Function to estimate swing speed
+        function estimateSwingSpeed() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const currentFrame = context.getImageData(0, 0, canvas.width, canvas.height);
+                const currentTime = performance.now();
 
-            if (!userPosition) {
-                // Save the initial touch position
-                userPosition = { x: event.clientX, y: event.clientY };
-                distanceOutput.textContent = 'Tap again to measure distance';
-            } else {
-                // Calculate distance between initial and new tap position
-                const newX = event.clientX;
-                const newY = event.clientY;
-                const distancePx = Math.sqrt(Math.pow(newX - userPosition.x, 2) + Math.pow(newY - userPosition.y, 2));
+                if (previousFrame && previousTime) {
+                    let motion = 0;
+                    let motionPixels = 0;
 
-                // Convert pixel distance to a rough estimate in yards (improved approach)
-                const distanceYards = (distancePx / window.innerWidth) * 150; // Example scaling factor for longer distances
-                distanceOutput.textContent = `Distance: ${distanceYards.toFixed(2)} Yards`;
+                    // Analyze motion by comparing current frame with the previous frame
+                    for (let i = 0; i < currentFrame.data.length; i += 4) {
+                        const delta = Math.abs(currentFrame.data[i] - previousFrame.data[i]);
+                        if (delta > 30) { // Threshold for detecting significant motion
+                            motion += delta;
+                            motionPixels++;
+                            // Draw feedback on canvas for detected motion
+                            const x = (i / 4) % canvas.width;
+                            const y = Math.floor((i / 4) / canvas.width);
+                            context.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                            context.fillRect(x, y, 2, 2); // Mark motion with a red dot
+                        }
+                    }
 
-                // Reset user position for next measurement
-                userPosition = null;
-                bullseye.style.display = 'none'; // Hide bullseye after measuring
+                    // Calculate motion density and estimate speed
+                    const motionDensity = motion / (canvas.width * canvas.height);
+                    const timeDelta = (currentTime - previousTime) / 1000; // Convert to seconds
+                    const estimatedSpeed = (motionDensity * 1000) / timeDelta; // Speed factor adjustment
+                    output.textContent = `Swing Speed: ${estimatedSpeed.toFixed(2)} mph`;
+                }
+
+                // Update previous frame and time
+                previousFrame = currentFrame;
+                previousTime = currentTime;
             }
-        });
+
+            // Repeat the process
+            requestAnimationFrame(estimateSwingSpeed);
+        }
 
         function logError(message) {
-            errorLog.style.display = 'block';
             errorLog.textContent += `${message}\n`;
             console.error(message);
         }
 
-        // Start the camera when the page loads
-        startCamera();
+        // Start the camera when the page loads and begin speed estimation
+        startCamera().then(estimateSwingSpeed);
     </script>
 </body>
 </html>
