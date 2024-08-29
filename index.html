@@ -74,6 +74,9 @@
         // Variables for motion tracking
         let previousFrame = null;
         let previousTime = null;
+        let swingDetected = false;
+        let motionThreshold = 50; // Threshold to detect significant motion for swings
+        let swingData = []; // To collect data points of the detected swing
 
         // Function to estimate swing speed
         function estimateSwingSpeed() {
@@ -84,14 +87,12 @@
 
                 if (previousFrame && previousTime) {
                     let motion = 0;
-                    let motionPixels = 0;
 
                     // Analyze motion by comparing current frame with the previous frame
                     for (let i = 0; i < currentFrame.data.length; i += 4) {
                         const delta = Math.abs(currentFrame.data[i] - previousFrame.data[i]);
-                        if (delta > 30) { // Threshold for detecting significant motion
+                        if (delta > 30) { // Detect significant motion
                             motion += delta;
-                            motionPixels++;
                             // Draw feedback on canvas for detected motion
                             const x = (i / 4) % canvas.width;
                             const y = Math.floor((i / 4) / canvas.width);
@@ -100,20 +101,38 @@
                         }
                     }
 
-                    // Calculate motion density and estimate speed
-                    const motionDensity = motion / (canvas.width * canvas.height);
-                    const timeDelta = (currentTime - previousTime) / 1000; // Convert to seconds
-                    const estimatedSpeed = (motionDensity * 1000) / timeDelta; // Speed factor adjustment
-                    output.textContent = `Swing Speed: ${estimatedSpeed.toFixed(2)} mph`;
-                }
+                    if (motion > motionThreshold) {
+                        swingDetected = true;
+                        swingData.push(motion);
+                    } else if (swingDetected) {
+                        // End of swing detected
+                        analyzeSwing(swingData);
+                        swingDetected = false;
+                        swingData = []; // Reset swing data
+                    }
 
-                // Update previous frame and time
-                previousFrame = currentFrame;
-                previousTime = currentTime;
+                    // Update previous frame and time
+                    previousFrame = currentFrame;
+                    previousTime = currentTime;
+                }
             }
 
             // Repeat the process
             requestAnimationFrame(estimateSwingSpeed);
+        }
+
+        function analyzeSwing(swingData) {
+            // Calculate swing speed based on motion data
+            const totalMotion = swingData.reduce((a, b) => a + b, 0);
+            const averageMotion = totalMotion / swingData.length;
+            const estimatedSpeed = averageMotion * 0.1; // Scale factor for mph
+            
+            output.textContent = `Swing Speed: ${estimatedSpeed.toFixed(2)} mph`;
+            if (estimatedSpeed > 0) {
+                output.textContent += " - Good Swing!";
+            } else {
+                output.textContent += " - Try Again!";
+            }
         }
 
         function logError(message) {
