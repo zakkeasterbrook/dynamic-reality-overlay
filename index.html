@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Reality Overlay</title>
+    <title>Next-Gen Interactive Experience</title>
     <style>
         body, html {
             margin: 0;
@@ -16,6 +16,7 @@
             justify-content: center;
             background-color: #000;
         }
+
         #cameraFeed {
             position: absolute;
             top: 0;
@@ -25,33 +26,82 @@
             object-fit: cover;
             z-index: 1;
         }
+
         .floatingElement {
             position: absolute;
             z-index: 2;
             color: #ffffff;
             font-size: 24px;
-            font-family: Arial, sans-serif;
+            font-family: 'Arial', sans-serif;
             padding: 10px;
             background: rgba(0, 0, 0, 0.5);
             border-radius: 5px;
             animation: float 5s infinite ease-in-out;
         }
+
         @keyframes float {
             0% { transform: translateY(0); }
             50% { transform: translateY(-20px); }
             100% { transform: translateY(0); }
         }
-        .interactionMessage {
+
+        #controlPanel {
             position: fixed;
             bottom: 10%;
-            width: 100%;
-            text-align: center;
-            z-index: 3;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 600px;
+            background: rgba(0, 0, 0, 0.8);
             color: #00ff00;
             font-size: 18px;
-            background: rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+            z-index: 3;
+            padding: 15px;
+            text-align: center;
+            font-family: 'Arial', sans-serif;
+        }
+
+        #lightToggle {
+            display: inline-block;
+            margin-top: 10px;
             padding: 10px;
-            font-family: Arial, sans-serif;
+            border: 2px solid #00ff00;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        #lightToggle:hover {
+            background: #00ff00;
+            color: #000;
+        }
+
+        .animatedObject {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: red;
+            border-radius: 50%;
+            animation: bounce 2s infinite ease-in-out;
+            z-index: 4;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-100px); }
+        }
+
+        #arObject {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+            width: 100px;
+            height: 100px;
+            background: url('https://via.placeholder.com/100') no-repeat center center;
+            background-size: contain;
         }
     </style>
 </head>
@@ -63,8 +113,18 @@
     <div id="floatingText1" class="floatingElement" style="top: 20%; left: 30%;">Welcome to the Future!</div>
     <div id="floatingText2" class="floatingElement" style="top: 60%; left: 10%;">Swipe to Explore</div>
 
-    <!-- Interaction Message -->
-    <div id="interactionMessage" class="interactionMessage">Swipe to move the elements!</div>
+    <!-- Interactive Control Panel -->
+    <div id="controlPanel">
+        <div>Swipe to Move Elements, Tap to Interact!</div>
+        <div id="lightToggle">Toggle Light</div>
+    </div>
+
+    <!-- Animated Objects -->
+    <div id="animatedObject1" class="animatedObject" style="top: 30%; left: 50%;"></div>
+    <div id="animatedObject2" class="animatedObject" style="top: 70%; left: 70%;"></div>
+
+    <!-- Augmented Reality Object -->
+    <div id="arObject"></div>
 
     <script>
         // Access User Camera
@@ -101,6 +161,22 @@
             // Update start positions
             startX = event.touches[0].clientX;
             startY = event.touches[0].clientY;
+        });
+
+        // Toggle Light Feature
+        const lightToggle = document.getElementById('lightToggle');
+        let isLightOn = false;
+        lightToggle.addEventListener('click', () => {
+            isLightOn = !isLightOn;
+            if (isLightOn) {
+                document.body.style.backgroundColor = '#fff';
+                document.querySelectorAll('.floatingElement').forEach(el => el.style.color = '#000');
+                lightToggle.innerText = 'Turn Off Light';
+            } else {
+                document.body.style.backgroundColor = '#000';
+                document.querySelectorAll('.floatingElement').forEach(el => el.style.color = '#fff');
+                lightToggle.innerText = 'Turn On Light';
+            }
         });
     </script>
 </body>
