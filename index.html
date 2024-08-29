@@ -51,6 +51,20 @@
         .button:hover {
             transform: scale(1.1);
         }
+        #error-log {
+            position: absolute;
+            bottom: 20%;
+            width: 90%;
+            left: 5%;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: red;
+            font-size: 14px;
+            z-index: 10;
+            max-height: 150px;
+            overflow-y: auto;
+            padding: 10px;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -75,9 +89,13 @@
         <div id="distance-output">Distance: -- Yards</div>
     </div>
 
+    <!-- Error Log Section -->
+    <div id="error-log"></div>
+
     <script>
         let targetPoint = document.getElementById('target-point');
         let distanceOutput = document.getElementById('distance-output');
+        let errorLog = document.getElementById('error-log');
         let userPosition = new THREE.Vector3(); // Stores the user's position
         let camera = document.querySelector('[camera]');
         let scene = document.querySelector('a-scene');
@@ -90,24 +108,39 @@
 
         // Click event to set the target point
         scene.addEventListener('click', (event) => {
-            let intersection = scene.querySelector('a-cursor').components.raycaster.getIntersection(targetPoint);
-            if (!intersection) {
-                let newPosition = camera.object3D.position.clone();
-                newPosition.add(camera.object3D.getWorldDirection(new THREE.Vector3()).multiplyScalar(10)); // 10 meters in front of the camera
-                targetPoint.setAttribute('position', newPosition);
-                targetPoint.setAttribute('visible', 'true');
-                calculateDistance(newPosition);
+            try {
+                let cursor = document.querySelector('a-entity[cursor]');
+                let intersection = cursor.components.raycaster.getIntersection(targetPoint);
+                if (!intersection) {
+                    let newPosition = camera.object3D.position.clone();
+                    newPosition.add(camera.object3D.getWorldDirection(new THREE.Vector3()).multiplyScalar(10)); // 10 meters in front of the camera
+                    targetPoint.setAttribute('position', newPosition);
+                    targetPoint.setAttribute('visible', 'true');
+                    calculateDistance(newPosition);
+                }
+            } catch (error) {
+                logError(error);
             }
         });
 
         function calculateDistance(targetPosition) {
-            // Get camera position
-            userPosition.setFromMatrixPosition(camera.object3D.matrixWorld);
-            let distance = userPosition.distanceTo(targetPosition);
+            try {
+                // Get camera position
+                userPosition.setFromMatrixPosition(camera.object3D.matrixWorld);
+                let distance = userPosition.distanceTo(targetPosition);
 
-            // Convert distance from meters to yards (1 meter = 1.09361 yards)
-            let distanceInYards = distance * 1.09361;
-            distanceOutput.textContent = `Distance: ${distanceInYards.toFixed(2)} Yards`;
+                // Convert distance from meters to yards (1 meter = 1.09361 yards)
+                let distanceInYards = distance * 1.09361;
+                distanceOutput.textContent = `Distance: ${distanceInYards.toFixed(2)} Yards`;
+            } catch (error) {
+                logError(error);
+            }
+        }
+
+        function logError(error) {
+            errorLog.style.display = 'block';
+            errorLog.textContent += `Error: ${error.message}\n`;
+            console.error(error);
         }
     </script>
 </body>
