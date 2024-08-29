@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Golf Club Head Tracker and Swing Speed Estimator</title>
+    <title>Enhanced Golf Club Head Tracker</title>
     <style>
         body {
             margin: 0;
@@ -77,8 +77,12 @@
         let clubHeadPath = []; // Path of detected club head
         let lastSwingTimestamp = 0;
 
-        // Color range for detecting club head (adjust based on club color)
-        const colorThreshold = { r: [150, 255], g: [150, 255], b: [150, 255] }; // Example for light-colored club head
+        // Updated color range for detecting the club head (adjust based on images)
+        const colorThreshold = { 
+            r: [50, 150],   // Example range for detecting metal/black parts
+            g: [50, 150],
+            b: [50, 150]
+        };
 
         function isClubHeadColor(r, g, b) {
             // Check if the color matches the expected range for the club head
@@ -111,7 +115,7 @@
                             const prevR = previousFrame.data[i];
                             const delta = Math.abs(r - prevR);
 
-                            if (delta > 50) { // Significant motion threshold
+                            if (delta > 30) { // Adjusted significant motion threshold
                                 motion += delta;
                                 const x = (i / 4) % canvas.width;
                                 const y = Math.floor((i / 4) / canvas.width);
