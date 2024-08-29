@@ -1,24 +1,256 @@
-    // Log errors
-    function logError(message) {
-        errorLog.textContent += `${message}\n`;
-        console.error(message);
-    }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate Golf Club Head Tracker</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #000;
+        }
+        #camera {
+            width: 100%;
+            height: 70%;
+            object-fit: cover;
+        }
+        #output {
+            color: yellow;
+            font-size: 24px;
+            margin-top: 10px;
+        }
+        #error-log {
+            color: red;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        #visual-feedback {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 70%;
+            pointer-events: none;
+            z-index: 2;
+        }
+        #controls {
+            position: fixed;
+            bottom: 10px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        .button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <video id="camera" autoplay playsinline></video>
+    <canvas id="visual-feedback"></canvas>
+    <div id="output">Swing Speed: -- mph</div>
+    <div id="error-log"></div>
 
-    // Reset tracking data
-    function resetTracking() {
-        previousFrame = null;
-        previousTime = null;
-        clubHeadPath = [];
-        output.textContent = "Swing Speed: -- mph";
-        logError("Tracking reset.");
-    }
+    <div id="controls">
+        <button class="button" onclick="resetTracking()">Reset Tracking</button>
+        <button class="button" onclick="toggleBoundingBox()">Toggle Bounding Box</button>
+    </div>
 
-    // Toggle the bounding box visibility
-    function toggleBoundingBox() {
-        showBoundingBox = !showBoundingBox;
-        logError(`Bounding box ${showBoundingBox ? 'enabled' : 'disabled'}.`);
-    }
+    <script>
+        const video = document.getElementById('camera');
+        const canvas = document.getElementById('visual-feedback');
+        const context = canvas.getContext('2d');
+        const output = document.getElementById('output');
+        const errorLog = document.getElementById('error-log');
 
-    // Start the camera and begin detection
-    startCamera().then(estimateSwingSpeed);
-</script>
+        // Variables for tracking
+        let previousFrame = null;
+        let previousTime = null;
+        let motionThreshold = 100; // Threshold for detecting significant motion
+        let clubHeadPath = []; // Path of detected club head
+        let lastSwingTimestamp = 0;
+        let showBoundingBox = true;
+
+        // Start camera
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment', frameRate: { ideal: 60, max: 120 } } 
+                });
+                video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                };
+            } catch (error) {
+                logError(`Error accessing the camera: ${error.message}`);
+            }
+        }
+
+        // Enhance image contrast
+        function enhanceContrast(imageData) {
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                data[i] = Math.min(255, data[i] * 1.2);     // Red
+                data[i + 1] = Math.min(255, data[i + 1] * 1.2); // Green
+                data[i + 2] = Math.min(255, data[i + 2] * 1.2); // Blue
+            }
+            return imageData;
+        }
+
+        // Detect edges using basic gradient calculation
+        function detectEdges(imageData) {
+            const data = imageData.data;
+            const width = imageData.width;
+            const height = imageData.height;
+            const edgeData = new Uint8ClampedArray(data.length);
+
+            function getPixel(x, y) {
+                const index = (y * width + x) * 4;
+                return [data[index], data[index + 1], data[index + 2]];
+            }
+
+            function setEdgePixel(x, y, value) {
+                const index = (y * width + x) * 4;
+                edgeData[index] = edgeData[index + 1] = edgeData[index + 2] = value;
+                edgeData[index + 3] = 255;
+            }
+
+            for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    const [r1, g1, b1] = getPixel(x - 1, y);
+                    const [r2, g2, b2] = getPixel(x + 1, y);
+                    const [r3, g3, b3] = getPixel(x, y - 1);
+                    const [r4, g4, b4] = getPixel(x, y + 1);
+
+                    const edgeValue = Math.abs(r1 - r2) + Math.abs(g1 - g2) + Math.abs(b1 - b2) +
+                                      Math.abs(r3 - r4) + Math.abs(g3 - g4) + Math.abs(b3 - b4);
+
+                    setEdgePixel(x, y, Math.min(255, edgeValue));
+                }
+            }
+
+            return new ImageData(edgeData, width, height);
+        }
+
+        // Main tracking function
+        function estimateSwingSpeed() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                let currentFrame = context.getImageData(0, 0, canvas.width, canvas.height);
+                currentFrame = enhanceContrast(currentFrame);
+                currentFrame = detectEdges(currentFrame);
+                const currentTime = performance.now();
+
+                if (previousFrame && previousTime) {
+                    let motion = 0;
+                    let clubHeadPositions = [];
+
+                    for (let i = 0; i < currentFrame.data.length; i += 4) {
+                        const delta = Math.abs(currentFrame.data[i] - previousFrame.data[i]);
+                        if (delta > 50) { // Significant motion threshold
+                            motion += delta;
+                            const x = (i / 4) % canvas.width;
+                            const y = Math.floor((i / 4) / canvas.width);
+                            if (showBoundingBox) {
+                                context.fillStyle = 'rgba(0, 255, 0, 0.5)';
+                                context.fillRect(x, y, 4, 4); // Visualize club head
+                            }
+                            clubHeadPositions.push({ x, y });
+                        }
+                    }
+
+                    if (clubHeadPositions.length > 0) {
+                        clubHeadPath = [...clubHeadPositions];
+                        drawClubHeadPath(clubHeadPath);
+                    }
+
+                    if (motion > motionThreshold && (currentTime - lastSwingTimestamp) > 500) {
+                        analyzeSwing(clubHeadPath);
+                        lastSwingTimestamp = currentTime;
+                    }
+
+                    previousFrame = currentFrame;
+                    previousTime = currentTime;
+                } else {
+                    previousFrame = currentFrame;
+                    previousTime = currentTime;
+                }
+            }
+
+            requestAnimationFrame(estimateSwingSpeed);
+        }
+
+        // Draw path of the club head
+        function drawClubHeadPath(path) {
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            context.strokeStyle = 'blue';
+            context.lineWidth = 3;
+            context.beginPath();
+            path.forEach((point, index) => {
+                if (index === 0) {
+                    context.moveTo(point.x, point.y);
+                } else {
+                    context.lineTo(point.x, point.y);
+                }
+            });
+            context.stroke();
+        }
+
+        // Analyze swing speed based on path
+        function analyzeSwing(path) {
+            if (path.length > 1) {
+                let totalDistance = 0;
+                for (let i = 1; i < path.length; i++) {
+                    const dx = path[i].x - path[i - 1].x;
+                    const dy = path[i].y - path[i - 1].y;
+                    totalDistance += Math.sqrt(dx * dx + dy * dy);
+                }
+                const estimatedSpeed = (totalDistance / path.length) * 0.6; // Scale factor for mph
+                output.textContent = `Swing Speed: ${estimatedSpeed.toFixed(2)} mph`;
+            } else {
+                output.textContent = "Swing Speed: -- mph - No Clear Swing Detected";
+            }
+        }
+
+        // Log errors
+        function logError(message) {
+            errorLog.textContent += `${message}\n`;
+            console.error(message);
+        }
+
+        // Reset tracking data
+        function resetTracking() {
+            previousFrame = null;
+            previousTime = null;
+            clubHeadPath = [];
+            output.textContent = "Swing Speed: -- mph";
+            logError("Tracking reset.");
+        }
+
+        // Toggle the bounding box visibility
+        function toggleBoundingBox() {
+            showBoundingBox = !showBoundingBox;
+                        logError(`Bounding box ${showBoundingBox ? 'enabled' : 'disabled'}.`);
+        }
+
+        // Start the camera and begin detection
+        startCamera().then(estimateSwingSpeed);
+    </script>
+</body>
+</html>
