@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Next-Gen Interactive Experience</title>
+    <title>AR Scratch-to-Win Game</title>
     <style>
         body, html {
             margin: 0;
@@ -27,81 +27,46 @@
             z-index: 1;
         }
 
-        .floatingElement {
-            position: absolute;
-            z-index: 2;
-            color: #ffffff;
-            font-size: 24px;
-            font-family: 'Arial', sans-serif;
-            padding: 10px;
-            background: rgba(0, 0, 0, 0.5);
-            border-radius: 5px;
-            animation: float 5s infinite ease-in-out;
-        }
-
-        @keyframes float {
-            0% { transform: translateY(0); }
-            50% { transform: translateY(-20px); }
-            100% { transform: translateY(0); }
-        }
-
-        #controlPanel {
-            position: fixed;
-            bottom: 10%;
-            left: 50%;
-            transform: translateX(-50%);
+        #scratchCard {
+            position: relative;
             width: 80%;
-            max-width: 600px;
-            background: rgba(0, 0, 0, 0.8);
-            color: #00ff00;
-            font-size: 18px;
-            border-radius: 10px;
-            z-index: 3;
-            padding: 15px;
-            text-align: center;
-            font-family: 'Arial', sans-serif;
+            max-width: 300px;
+            height: 400px;
+            background-color: #ccc;
+            overflow: hidden;
+            border-radius: 15px;
+            margin: auto;
+            z-index: 2;
         }
 
-        #lightToggle {
-            display: inline-block;
-            margin-top: 10px;
-            padding: 10px;
-            border: 2px solid #00ff00;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-
-        #lightToggle:hover {
-            background: #00ff00;
-            color: #000;
-        }
-
-        .animatedObject {
+        #scratchOverlay {
             position: absolute;
-            width: 50px;
-            height: 50px;
-            background: red;
-            border-radius: 50%;
-            animation: bounce 2s infinite ease-in-out;
-            z-index: 4;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('https://via.placeholder.com/300x400') no-repeat center center;
+            background-size: cover;
+            z-index: 3;
         }
 
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-100px); }
-        }
-
-        #arObject {
+        #winMessage, #loseMessage {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            z-index: 5;
-            width: 100px;
-            height: 100px;
-            background: url('https://via.placeholder.com/100') no-repeat center center;
-            background-size: contain;
+            color: white;
+            font-size: 2em;
+            display: none;
+            z-index: 4;
+        }
+
+        #winMessage {
+            color: #00FF00;
+        }
+
+        #loseMessage {
+            color: #FF0000;
         }
     </style>
 </head>
@@ -109,74 +74,71 @@
     <!-- Camera Feed -->
     <video id="cameraFeed" autoplay muted playsinline></video>
 
-    <!-- Floating Elements -->
-    <div id="floatingText1" class="floatingElement" style="top: 20%; left: 30%;">Welcome to the Future!</div>
-    <div id="floatingText2" class="floatingElement" style="top: 60%; left: 10%;">Swipe to Explore</div>
-
-    <!-- Interactive Control Panel -->
-    <div id="controlPanel">
-        <div>Swipe to Move Elements, Tap to Interact!</div>
-        <div id="lightToggle">Toggle Light</div>
+    <!-- Scratch Card Area -->
+    <div id="scratchCard">
+        <canvas id="scratchOverlay"></canvas>
+        <div id="winMessage">🎉 You Win! 🎉</div>
+        <div id="loseMessage">🙁 Try Again! 🙁</div>
     </div>
 
-    <!-- Animated Objects -->
-    <div id="animatedObject1" class="animatedObject" style="top: 30%; left: 50%;"></div>
-    <div id="animatedObject2" class="animatedObject" style="top: 70%; left: 70%;"></div>
-
-    <!-- Augmented Reality Object -->
-    <div id="arObject"></div>
-
     <script>
-        // Access User Camera
+        // Camera Feed Setup
         const cameraFeed = document.getElementById('cameraFeed');
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
             navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-            .then(stream => {
-                cameraFeed.srcObject = stream;
-            }).catch(console.error);
+                .then(stream => {
+                    cameraFeed.srcObject = stream;
+                })
+                .catch(console.error);
         } else {
             alert('Camera access is not supported on this device or browser.');
         }
 
-        // Gesture Detection for Swiping
-        let startX = 0, startY = 0;
-        document.body.addEventListener('touchstart', (event) => {
-            startX = event.touches[0].clientX;
-            startY = event.touches[0].clientY;
-        });
+        // Scratch-off Game Setup
+        const canvas = document.getElementById('scratchOverlay');
+        const ctx = canvas.getContext('2d');
+        let isScratching = false;
+        const winMessage = document.getElementById('winMessage');
+        const loseMessage = document.getElementById('loseMessage');
 
-        document.body.addEventListener('touchmove', (event) => {
-            let deltaX = event.touches[0].clientX - startX;
-            let deltaY = event.touches[0].clientY - startY;
+        canvas.width = canvas.parentElement.clientWidth;
+        canvas.height = canvas.parentElement.clientHeight;
 
-            // Move Floating Elements
-            const floatingText1 = document.getElementById('floatingText1');
-            floatingText1.style.left = parseInt(floatingText1.style.left) + deltaX + 'px';
-            floatingText1.style.top = parseInt(floatingText1.style.top) + deltaY + 'px';
+        ctx.fillStyle = '#B0B0B0';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            const floatingText2 = document.getElementById('floatingText2');
-            floatingText2.style.left = parseInt(floatingText2.style.left) + deltaX + 'px';
-            floatingText2.style.top = parseInt(floatingText2.style.top) + deltaY + 'px';
-
-            // Update start positions
-            startX = event.touches[0].clientX;
-            startY = event.touches[0].clientY;
-        });
-
-        // Toggle Light Feature
-        const lightToggle = document.getElementById('lightToggle');
-        let isLightOn = false;
-        lightToggle.addEventListener('click', () => {
-            isLightOn = !isLightOn;
-            if (isLightOn) {
-                document.body.style.backgroundColor = '#fff';
-                document.querySelectorAll('.floatingElement').forEach(el => el.style.color = '#000');
-                lightToggle.innerText = 'Turn Off Light';
+        const revealOutcome = () => {
+            // Randomly decide win or lose
+            if (Math.random() > 0.5) {
+                winMessage.style.display = 'block';
             } else {
-                document.body.style.backgroundColor = '#000';
-                document.querySelectorAll('.floatingElement').forEach(el => el.style.color = '#fff');
-                lightToggle.innerText = 'Turn On Light';
+                loseMessage.style.display = 'block';
             }
+        };
+
+        // Scratch-Off Effect
+        canvas.addEventListener('mousedown', (e) => { isScratching = true; });
+        canvas.addEventListener('mouseup', (e) => { isScratching = false; revealOutcome(); });
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isScratching) return;
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.beginPath();
+            ctx.arc(e.offsetX, e.offsetY, 20, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // For Touch Devices
+        canvas.addEventListener('touchstart', (e) => { isScratching = true; });
+        canvas.addEventListener('touchend', (e) => { isScratching = false; revealOutcome(); });
+        canvas.addEventListener('touchmove', (e) => {
+            if (!isScratching) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.touches[0].clientX - rect.left;
+            const y = e.touches[0].clientY - rect.top;
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.beginPath();
+            ctx.arc(x, y, 20, 0, Math.PI * 2);
+            ctx.fill();
         });
     </script>
 </body>
