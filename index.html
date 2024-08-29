@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Golf Range Finder App</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <script src="https://cdn.rawgit.com/AR-js-org/AR.js/3.3.2/aframe/build/aframe-ar.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
     <style>
         body {
             margin: 0;
@@ -16,6 +16,16 @@
             justify-content: center;
             height: 100vh;
             background-color: #000;
+        }
+        #distance-output {
+            position: absolute;
+            top: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            color: yellow;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 5;
         }
         #ui {
             position: absolute;
@@ -41,33 +51,19 @@
         .button:hover {
             transform: scale(1.1);
         }
-        #distance-output {
-            position: absolute;
-            top: 10%;
-            left: 50%;
-            transform: translateX(-50%);
-            color: yellow;
-            font-size: 24px;
-            font-weight: bold;
-            z-index: 5;
-        }
     </style>
 </head>
 <body>
     <!-- A-Frame Scene for AR -->
     <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
-        <!-- AR Marker (you can use any pattern marker) -->
-        <a-marker preset="hiro">
-            <!-- Flag Marker -->
-            <a-entity id="flag" geometry="primitive: cone; radiusBottom: 0.1; radiusTop: 0; height: 0.5;" 
-                      material="color: red;" position="0 0 0" 
-                      event-set__click="_event: click; color: green;">
-            </a-entity>
-        </a-marker>
-
         <!-- AR Camera -->
-        <a-entity camera></a-entity>
-        
+        <a-entity camera look-controls>
+            <a-entity cursor="fuse: false; rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
+        </a-entity>
+
+        <!-- Point to Click -->
+        <a-sphere id="target-point" class="clickable" position="0 0 0" radius="0.1" color="red" visible="false"></a-sphere>
+
         <!-- Realistic Lighting -->
         <a-light type="directional" position="2 4 4" intensity="1" castShadow="true"></a-light>
         <a-light type="ambient" color="#ffffff" intensity="0.5"></a-light>
@@ -75,32 +71,52 @@
 
     <!-- UI Elements -->
     <div id="ui">
-        <button class="button" onclick="calculateDistance()">Measure Distance</button>
+        <button class="button" onclick="resetDistance()">Reset Distance</button>
         <div id="distance-output">Distance: -- Yards</div>
     </div>
 
     <script>
-        let flag = document.getElementById('flag');
+        let targetPoint = document.getElementById('target-point');
         let distanceOutput = document.getElementById('distance-output');
         let userPosition = { x: 0, y: 0, z: 0 }; // Placeholder for the user's position
         let isMeasuring = false;
 
-        function calculateDistance() {
-            if (!isMeasuring) {
-                isMeasuring = true;
-                // Assuming the user's position is the origin (0, 0, 0)
-                let flagPosition = flag.object3D.position;
-                let distance = Math.sqrt(
-                    Math.pow(flagPosition.x - userPosition.x, 2) +
-                    Math.pow(flagPosition.y - userPosition.y, 2) +
-                    Math.pow(flagPosition.z - userPosition.z, 2)
-                );
+        // Function to reset the measurement
+        function resetDistance() {
+            targetPoint.setAttribute('visible', 'false');
+            distanceOutput.textContent = 'Distance: -- Yards';
+            isMeasuring = false;
+        }
 
-                // Convert distance from meters to yards (1 meter = 1.09361 yards)
-                let distanceInYards = distance * 1.09361;
-                distanceOutput.textContent = `Distance: ${distanceInYards.toFixed(2)} Yards`;
-                isMeasuring = false;
+        // Set the cursor to select a point
+        document.querySelector('a-scene').addEventListener('click', (event) => {
+            if (isMeasuring) return;
+
+            // Get the position of the click (target point)
+            let intersection = event.detail.intersection;
+            if (intersection) {
+                let point = intersection.point;
+                targetPoint.setAttribute('position', point);
+                targetPoint.setAttribute('visible', 'true');
+
+                // Calculate distance
+                calculateDistance(point);
             }
+        });
+
+        function calculateDistance(point) {
+            isMeasuring = true;
+
+            // Calculate the distance in 3D space from the user position to the target point
+            let distance = Math.sqrt(
+                Math.pow(point.x - userPosition.x, 2) +
+                Math.pow(point.y - userPosition.y, 2) +
+                Math.pow(point.z - userPosition.z, 2)
+            );
+
+            // Convert distance from meters to yards (1 meter = 1.09361 yards)
+            let distanceInYards = distance * 1.09361;
+            distanceOutput.textContent = `Distance: ${distanceInYards.toFixed(2)} Yards`;
         }
     </script>
 </body>
