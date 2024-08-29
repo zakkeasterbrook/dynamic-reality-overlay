@@ -3,143 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Scratch-to-Win Game</title>
+    <title>3D AR Scratch-to-Win Game</title>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.rawgit.com/AR-js-org/AR.js/3.3.2/aframe/build/aframe-ar.js"></script>
     <style>
-        body, html {
+        body {
             margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
             overflow: hidden;
+            font-family: Arial, sans-serif;
             display: flex;
             align-items: center;
             justify-content: center;
+            height: 100vh;
             background-color: #000;
         }
 
-        #cameraFeed {
+        #ui {
             position: absolute;
-            top: 0;
-            left: 0;
+            bottom: 10%;
             width: 100%;
-            height: 100%;
-            object-fit: cover;
-            z-index: 1;
-        }
-
-        #scratchCard {
-            position: relative;
-            width: 80%;
-            max-width: 300px;
-            height: 400px;
-            background-color: #ccc;
-            overflow: hidden;
-            border-radius: 15px;
-            margin: auto;
-            z-index: 2;
-        }
-
-        #scratchOverlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: url('https://via.placeholder.com/300x400') no-repeat center center;
-            background-size: cover;
-            z-index: 3;
-        }
-
-        #winMessage, #loseMessage {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            text-align: center;
             color: white;
-            font-size: 2em;
-            display: none;
-            z-index: 4;
+            font-size: 24px;
+            z-index: 5;
         }
 
-        #winMessage {
-            color: #00FF00;
+        .scratch-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #FF6347;
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: transform 0.2s;
         }
 
-        #loseMessage {
-            color: #FF0000;
+        .scratch-button:hover {
+            transform: scale(1.1);
         }
     </style>
 </head>
 <body>
-    <!-- Camera Feed -->
-    <video id="cameraFeed" autoplay muted playsinline></video>
+    <!-- A-Frame Scene -->
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+        <!-- AR Marker -->
+        <a-marker preset="hiro">
+            <!-- 3D Scratch Card -->
+            <a-entity id="scratch-card" position="0 0 0" rotation="0 0 0" scale="1 1 1">
+                <a-box id="card-base" position="0 0.1 0" depth="1" height="0.01" width="1" color="#cccccc"></a-box>
+                <!-- Scratchable Layer -->
+                <a-plane id="scratch-layer" position="0 0.11 0" width="1" height="1" color="#999999" material="opacity: 1; transparent: true;"></a-plane>
+                <!-- Hidden Win/Loss Text -->
+                <a-text id="win-text" value="You Win!" position="0 0.5 0" rotation="0 0 0" scale="3 3 3" visible="false" color="#00FF00"></a-text>
+                <a-text id="lose-text" value="Try Again!" position="0 0.5 0" rotation="0 0 0" scale="3 3 3" visible="false" color="#FF0000"></a-text>
+            </a-entity>
+        </a-marker>
 
-    <!-- Scratch Card Area -->
-    <div id="scratchCard">
-        <canvas id="scratchOverlay"></canvas>
-        <div id="winMessage">🎉 You Win! 🎉</div>
-        <div id="loseMessage">🙁 Try Again! 🙁</div>
+        <!-- AR Camera -->
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <!-- UI Elements -->
+    <div id="ui">
+        <button class="scratch-button" onclick="startScratching()">Start Scratching</button>
     </div>
 
     <script>
-        // Camera Feed Setup
-        const cameraFeed = document.getElementById('cameraFeed');
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-                .then(stream => {
-                    cameraFeed.srcObject = stream;
-                })
-                .catch(console.error);
-        } else {
-            alert('Camera access is not supported on this device or browser.');
+        let isScratching = false;
+        const scratchLayer = document.getElementById('scratch-layer');
+        const winText = document.getElementById('win-text');
+        const loseText = document.getElementById('lose-text');
+        let scratchCount = 0;
+        const maxScratches = 10; // Number of scratches needed to reveal the outcome
+
+        // Randomize the outcome of the game
+        const isWinner = Math.random() > 0.5;
+
+        function startScratching() {
+            isScratching = true;
+            document.querySelector('.scratch-button').style.display = 'none';
         }
 
-        // Scratch-off Game Setup
-        const canvas = document.getElementById('scratchOverlay');
-        const ctx = canvas.getContext('2d');
-        let isScratching = false;
-        const winMessage = document.getElementById('winMessage');
-        const loseMessage = document.getElementById('loseMessage');
+        // Scratch layer logic
+        scratchLayer.addEventListener('click', () => {
+            if (!isScratching) return;
+            scratchCount++;
+            scratchLayer.setAttribute('material', 'opacity', 1 - scratchCount / maxScratches);
 
-        canvas.width = canvas.parentElement.clientWidth;
-        canvas.height = canvas.parentElement.clientHeight;
+            // Cool animation for scratching effect
+            const scratchParticles = document.createElement('a-entity');
+            scratchParticles.setAttribute('geometry', 'primitive: sphere; radius: 0.05');
+            scratchParticles.setAttribute('material', 'color: #ffffff');
+            scratchParticles.setAttribute('position', `${(Math.random() - 0.5)} ${(Math.random() - 0.5)} 0.1`);
+            scratchLayer.appendChild(scratchParticles);
 
-        ctx.fillStyle = '#B0B0B0';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        const revealOutcome = () => {
-            // Randomly decide win or lose
-            if (Math.random() > 0.5) {
-                winMessage.style.display = 'block';
-            } else {
-                loseMessage.style.display = 'block';
+            // Check if all scratches are done
+            if (scratchCount >= maxScratches) {
+                isScratching = false;
+                revealOutcome();
             }
-        };
-
-        // Scratch-Off Effect
-        canvas.addEventListener('mousedown', (e) => { isScratching = true; });
-        canvas.addEventListener('mouseup', (e) => { isScratching = false; revealOutcome(); });
-        canvas.addEventListener('mousemove', (e) => {
-            if (!isScratching) return;
-            ctx.globalCompositeOperation = 'destination-out';
-            ctx.beginPath();
-            ctx.arc(e.offsetX, e.offsetY, 20, 0, Math.PI * 2);
-            ctx.fill();
         });
 
-        // For Touch Devices
-        canvas.addEventListener('touchstart', (e) => { isScratching = true; });
-        canvas.addEventListener('touchend', (e) => { isScratching = false; revealOutcome(); });
-        canvas.addEventListener('touchmove', (e) => {
-            if (!isScratching) return;
-            const rect = canvas.getBoundingClientRect();
-            const x = e.touches[0].clientX - rect.left;
-            const y = e.touches[0].clientY - rect.top;
-            ctx.globalCompositeOperation = 'destination-out';
-            ctx.beginPath();
-            ctx.arc(x, y, 20, 0, Math.PI * 2);
-            ctx.fill();
-        });
+        function revealOutcome() {
+            if (isWinner) {
+                winText.setAttribute('visible', 'true');
+                winText.setAttribute('animation', 'property: scale; to: 4 4 4; easing: easeInOutQuad; loop: true; dur: 1000');
+            } else {
+                loseText.setAttribute('visible', 'true');
+                loseText.setAttribute('animation', 'property: rotation; to: 0 360 0; easing: linear; loop: true; dur: 2000');
+            }
+        }
     </script>
 </body>
 </html>
