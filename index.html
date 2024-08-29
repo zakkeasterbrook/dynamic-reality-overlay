@@ -61,8 +61,8 @@
             <a-entity cursor="fuse: false; rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
         </a-entity>
 
-        <!-- Point to Click -->
-        <a-sphere id="target-point" class="clickable" position="0 0 0" radius="0.1" color="red" visible="false"></a-sphere>
+        <!-- Target Point for Measuring Distance -->
+        <a-sphere id="target-point" class="clickable" radius="0.2" color="red" visible="false"></a-sphere>
 
         <!-- Realistic Lighting -->
         <a-light type="directional" position="2 4 4" intensity="1" castShadow="true"></a-light>
@@ -78,41 +78,32 @@
     <script>
         let targetPoint = document.getElementById('target-point');
         let distanceOutput = document.getElementById('distance-output');
-        let userPosition = { x: 0, y: 0, z: 0 }; // Placeholder for the user's position
-        let isMeasuring = false;
+        let userPosition = new THREE.Vector3(); // Stores the user's position
+        let camera = document.querySelector('[camera]');
+        let scene = document.querySelector('a-scene');
 
         // Function to reset the measurement
         function resetDistance() {
             targetPoint.setAttribute('visible', 'false');
             distanceOutput.textContent = 'Distance: -- Yards';
-            isMeasuring = false;
         }
 
-        // Set the cursor to select a point
-        document.querySelector('a-scene').addEventListener('click', (event) => {
-            if (isMeasuring) return;
-
-            // Get the position of the click (target point)
-            let intersection = event.detail.intersection;
-            if (intersection) {
-                let point = intersection.point;
-                targetPoint.setAttribute('position', point);
+        // Click event to set the target point
+        scene.addEventListener('click', (event) => {
+            let intersection = scene.querySelector('a-cursor').components.raycaster.getIntersection(targetPoint);
+            if (!intersection) {
+                let newPosition = camera.object3D.position.clone();
+                newPosition.add(camera.object3D.getWorldDirection(new THREE.Vector3()).multiplyScalar(10)); // 10 meters in front of the camera
+                targetPoint.setAttribute('position', newPosition);
                 targetPoint.setAttribute('visible', 'true');
-
-                // Calculate distance
-                calculateDistance(point);
+                calculateDistance(newPosition);
             }
         });
 
-        function calculateDistance(point) {
-            isMeasuring = true;
-
-            // Calculate the distance in 3D space from the user position to the target point
-            let distance = Math.sqrt(
-                Math.pow(point.x - userPosition.x, 2) +
-                Math.pow(point.y - userPosition.y, 2) +
-                Math.pow(point.z - userPosition.z, 2)
-            );
+        function calculateDistance(targetPosition) {
+            // Get camera position
+            userPosition.setFromMatrixPosition(camera.object3D.matrixWorld);
+            let distance = userPosition.distanceTo(targetPosition);
 
             // Convert distance from meters to yards (1 meter = 1.09361 yards)
             let distanceInYards = distance * 1.09361;
