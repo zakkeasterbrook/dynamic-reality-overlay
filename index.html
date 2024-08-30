@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lightweight Object Detector</title>
+    <title>Precise Object Detector</title>
     <!-- Include TensorFlow.js and MobileNet-SSD model -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
@@ -120,8 +120,7 @@
                 });
                 video.srcObject = stream;
                 video.onloadedmetadata = () => {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
+                    adjustCanvasSize();
                     detectObjects();
                 };
                 window.addEventListener('resize', adjustCanvasSize);
@@ -132,8 +131,13 @@
 
         // Adjust canvas size to match video dimensions
         function adjustCanvasSize() {
+            const aspectRatio = video.videoWidth / video.videoHeight;
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
+            video.style.width = `${window.innerWidth}px`;
+            video.style.height = `${window.innerWidth / aspectRatio}px`;
+            canvas.style.width = video.style.width;
+            canvas.style.height = video.style.height;
         }
 
         // Detect objects using the MobileNet-SSD model
