@@ -119,13 +119,23 @@
                 });
                 video.srcObject = stream;
                 video.onloadedmetadata = () => {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
+                    adjustCanvasSize();
                     detectObjects();
                 };
+                window.addEventListener('resize', adjustCanvasSize);
             } catch (error) {
                 logError(`Error accessing the camera: ${error.message}. Please check camera permissions or try a different device.`);
             }
+        }
+
+        // Adjust canvas size to match video dimensions
+        function adjustCanvasSize() {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const aspectRatio = video.videoWidth / video.videoHeight;
+            const videoContainer = document.getElementById('camera');
+            videoContainer.style.width = `${window.innerWidth}px`;
+            videoContainer.style.height = `${window.innerWidth / aspectRatio}px`;
         }
 
         // Detect objects using the YOLOv5 model
@@ -140,7 +150,6 @@
                 const labels = results.labels.data;
 
                 context.clearRect(0, 0, canvas.width, canvas.height);
-
                 drawResults(boxes, scores, labels);
                 requestAnimationFrame(detectObjects);
             } catch (error) {
@@ -168,7 +177,7 @@
             const threshold = 0.5; // Confidence threshold
             for (let i = 0; i < scores.length; i++) {
                 if (scores[i] > threshold) {
-                    const [x, y, width, height] = boxes.slice(i * 4, i * 4 + 4);
+                    const [x, y, width, height] = boxes.slice(i * 4, i * 4 + 4).map(v => v * canvas.width);
                     context.strokeStyle = 'cyan';
                     context.lineWidth = 2;
                     context.strokeRect(x, y, width, height);
