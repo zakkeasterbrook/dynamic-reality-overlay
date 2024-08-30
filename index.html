@@ -140,9 +140,8 @@
             ]);
             context.clearRect(0, 0, canvas.width, canvas.height);
             predictions.forEach(prediction => {
-                if (prediction.class === 'sports ball' || prediction.class === 'person') { // Adjust class based on expected object
-                    drawBoundingBox(prediction);
-                }
+                // Draw all detected objects and label them
+                drawBoundingBox(prediction);
             });
             drawPoses(poses);
             requestAnimationFrame(detectObjectsAndPoses);
@@ -150,16 +149,24 @@
 
         // Draw bounding box around detected objects
         function drawBoundingBox(prediction) {
+            const scaleX = canvas.width / video.videoWidth;
+            const scaleY = canvas.height / video.videoHeight;
+            const x = prediction.bbox[0] * scaleX;
+            const y = prediction.bbox[1] * scaleY;
+            const width = prediction.bbox[2] * scaleX;
+            const height = prediction.bbox[3] * scaleY;
+
             context.strokeStyle = 'cyan';
             context.lineWidth = 3;
             context.beginPath();
-            context.rect(...prediction.bbox);
+            context.rect(x, y, width, height);
             context.stroke();
             context.fillStyle = 'cyan';
+            context.font = '16px Arial';
             context.fillText(
                 `${prediction.class} - ${Math.round(prediction.score * 100)}%`,
-                prediction.bbox[0],
-                prediction.bbox[1] > 10 ? prediction.bbox[1] - 5 : 10
+                x,
+                y > 10 ? y - 5 : 10
             );
         }
 
