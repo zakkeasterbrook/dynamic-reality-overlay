@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Perfect Object Detector</title>
+    <title>Precise Object Detector with Alignment Correction</title>
     <!-- Include TensorFlow.js and MobileNet-SSD model -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
@@ -104,6 +104,7 @@
         const errorLog = document.getElementById('error-log');
         let model;
         let showBoundingBox = true;
+        const verticalOffset = 10; // Adjust this value to bring the bounding boxes down
 
         // Load the MobileNet-SSD model
         async function loadModel() {
@@ -176,7 +177,7 @@
                 );
                 context.strokeStyle = 'cyan';
                 context.lineWidth = 2;
-                context.strokeRect(x, y, width, height);
+                context.strokeRect(x, y + verticalOffset, width, height);
                 context.fillStyle = 'cyan';
                 context.font = '16px Arial';
                 context.fillText(
