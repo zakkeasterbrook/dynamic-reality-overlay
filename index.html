@@ -3,11 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate Golf Club Head Tracker</title>
-    <!-- Include TensorFlow.js and necessary models -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
+    <title>Advanced Object Detector</title>
+    <!-- Include ONNX.js for running YOLOv5 in the browser -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -40,7 +38,7 @@
             z-index: 2;
         }
         #output {
-            font-size: 28px;
+            font-size: 24px;
             font-weight: bold;
             text-shadow: 0 0 5px #000;
             margin-top: 10px;
@@ -62,7 +60,7 @@
         }
         .button {
             padding: 10px 25px;
-            font-size: 18px;
+            font-size: 16px;
             background: #28a745;
             color: white;
             border: none;
@@ -84,7 +82,7 @@
 <body>
     <video id="camera" autoplay playsinline></video>
     <canvas id="visual-feedback"></canvas>
-    <div id="output">Swing Speed: -- mph</div>
+    <div id="output">Objects detected: --</div>
     <div id="error-log"></div>
 
     <div id="controls">
@@ -99,102 +97,91 @@
         const context = canvas.getContext('2d');
         const output = document.getElementById('output');
         const errorLog = document.getElementById('error-log');
-
-        // Variables for tracking
-        let motionThreshold = 200; // Adjust threshold for detecting significant motion
+        let session;
         let showBoundingBox = true;
-        let objectModel, poseModel;
 
-        // Load models
-        async function loadModels() {
-            [objectModel, poseModel] = await Promise.all([cocoSsd.load(), posenet.load()]);
-            logError("Models loaded successfully.");
-            startCamera();
+        // Load the ONNX model for YOLOv5
+        async function loadModel() {
+            try {
+                session = await ort.InferenceSession.create('./yolov5s.onnx');
+                logError("Model loaded successfully.");
+                startCamera();
+            } catch (error) {
+                logError(`Error loading model: ${error.message}`);
+            }
         }
 
         // Start camera
         async function startCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: { ideal: 'environment' }, frameRate: { ideal: 60, max: 120 } } 
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: 'environment' }, frameRate: { ideal: 30, max: 60 } }
                 });
                 video.srcObject = stream;
                 video.onloadedmetadata = () => {
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
-                    detectObjectsAndPoses();
+                    detectObjects();
                 };
             } catch (error) {
                 logError(`Error accessing the camera: ${error.message}. Please check camera permissions or try a different device.`);
             }
         }
 
-        // Detect objects and poses in the video frame
-        async function detectObjectsAndPoses() {
-            const [predictions, poses] = await Promise.all([
-                objectModel.detect(video),
-                poseModel.estimateSinglePose(video, {
-                    flipHorizontal: false,
-                    decodingMethod: 'single-person'
-                })
-            ]);
-            context.clearRect(0, 0, canvas.width, canvas.height);
-            predictions.forEach(prediction => {
-                // Draw all detected objects and label them
-                drawBoundingBox(prediction);
-            });
-            drawPoses(poses);
-            requestAnimationFrame(detectObjectsAndPoses);
-        }
+        // Detect objects using the YOLOv5 model
+        async function detectObjects() {
+            try {
+                // Prepare the image tensor for input
+                const tensor = await preprocessImage(video, canvas.width, canvas.height);
+                const feeds = { 'images': tensor };
+                const results = await session.run(feeds);
+                const boxes = results.boxes.data;
+                const scores = results.scores.data;
+                const labels = results.labels.data;
 
-        // Draw bounding box around detected objects
-        function drawBoundingBox(prediction) {
-            const scaleX = canvas.width / video.videoWidth;
-            const scaleY = canvas.height / video.videoHeight;
-            const x = prediction.bbox[0] * scaleX;
-            const y = prediction.bbox[1] * scaleY;
-            const width = prediction.bbox[2] * scaleX;
-            const height = prediction.bbox[3] * scaleY;
+                context.clearRect(0, 0, canvas.width, canvas.height);
 
-            context.strokeStyle = 'cyan';
-            context.lineWidth = 3;
-            context.beginPath();
-            context.rect(x, y, width, height);
-            context.stroke();
-            context.fillStyle = 'cyan';
-            context.font = '16px Arial';
-            context.fillText(
-                `${prediction.class} - ${Math.round(prediction.score * 100)}%`,
-                x,
-                y > 10 ? y - 5 : 10
-            );
-        }
-
-        // Draw poses detected by PoseNet
-        function drawPoses(pose) {
-            if (pose && pose.keypoints) {
-                context.fillStyle = 'yellow';
-                context.strokeStyle = 'yellow';
-                context.lineWidth = 2;
-
-                // Draw keypoints
-                pose.keypoints.forEach(keypoint => {
-                    if (keypoint.score > 0.5) { // Draw only if the confidence score is high enough
-                        context.beginPath();
-                        context.arc(keypoint.position.x, keypoint.position.y, 5, 0, 2 * Math.PI);
-                        context.fill();
-                    }
-                });
-
-                // Draw skeleton
-                const adjacentKeyPoints = posenet.getAdjacentKeyPoints(pose.keypoints, 0.5);
-                adjacentKeyPoints.forEach(([from, to]) => {
-                    context.beginPath();
-                    context.moveTo(from.position.x, from.position.y);
-                    context.lineTo(to.position.x, to.position.y);
-                    context.stroke();
-                });
+                drawResults(boxes, scores, labels);
+                requestAnimationFrame(detectObjects);
+            } catch (error) {
+                logError(`Error during detection: ${error.message}`);
             }
+        }
+
+        // Preprocess the image from the video feed for the model
+        async function preprocessImage(video, width, height) {
+            context.drawImage(video, 0, 0, width, height);
+            const imageData = context.getImageData(0, 0, width, height);
+            const data = imageData.data;
+            // Normalize the pixel values
+            const float32Data = new Float32Array(width * height * 3);
+            for (let i = 0; i < data.length; i += 4) {
+                float32Data[i / 4 * 3] = data[i] / 255.0;
+                float32Data[i / 4 * 3 + 1] = data[i + 1] / 255.0;
+                float32Data[i / 4 * 3 + 2] = data[i + 2] / 255.0;
+            }
+            return new ort.Tensor('float32', float32Data, [1, 3, height, width]);
+        }
+
+        // Draw detection results
+        function drawResults(boxes, scores, labels) {
+            const threshold = 0.5; // Confidence threshold
+            for (let i = 0; i < scores.length; i++) {
+                if (scores[i] > threshold) {
+                    const [x, y, width, height] = boxes.slice(i * 4, i * 4 + 4);
+                    context.strokeStyle = 'cyan';
+                    context.lineWidth = 2;
+                    context.strokeRect(x, y, width, height);
+                    context.fillStyle = 'cyan';
+                    context.font = '16px Arial';
+                    context.fillText(
+                        `${labels[i]} - ${Math.round(scores[i] * 100)}%`,
+                        x,
+                        y > 10 ? y - 5 : 10
+                    );
+                }
+            }
+            output.textContent = `Objects detected: ${labels.length}`;
         }
 
         // Log errors
@@ -205,7 +192,7 @@
 
         // Reset tracking data
         function resetTracking() {
-            output.textContent = "Swing Speed: -- mph";
+            output.textContent = "Objects detected: --";
             logError("Tracking reset.");
         }
 
@@ -215,14 +202,14 @@
             logError(`Bounding box ${showBoundingBox ? 'enabled' : 'disabled'}.`);
         }
 
-        // Adjust sensitivity of motion detection
+        // Adjust sensitivity of detection
         function adjustSensitivity() {
-            motionThreshold = prompt("Set motion sensitivity (default 200):", motionThreshold) || motionThreshold;
-            logError(`Motion sensitivity adjusted to ${motionThreshold}.`);
+            const newThreshold = prompt("Set detection threshold (default 0.5):", 0.5);
+            logError(`Detection threshold adjusted to ${newThreshold}.`);
         }
 
-        // Load models and start application
-        loadModels();
+        // Load model and start the application
+        loadModel();
     </script>
 </body>
 </html>
